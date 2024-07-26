@@ -1391,6 +1391,8 @@ class DipoleSurfaceManager(PropertyManager):
     name='DipoleSurface'
     def __init__(self, mol, surface=None, derivatives=None):
         super().__init__(mol)
+        self.select_anharmonic_modes = mol.select_anharmonic_modes
+        self.natoms = len(mol.atoms)
         self._surf = surface
         if isinstance(derivatives, dict):
             self._derivs = derivatives['numerical']
@@ -1418,7 +1420,8 @@ class DipoleSurfaceManager(PropertyManager):
     @property
     def derivatives(self):
         if self._derivs is None:
-            derivatives = self.load_dipole_derivatives()
+            derivatives = self.load_dipole_derivatives(select_anharmonic_modes=self.select_anharmonic_modes,
+                                                       natoms=self.natoms)
             if isinstance(derivatives, dict):
                 self._numerical_derivs = derivatives['numerical']
                 self._derivs = derivatives['analytic']
@@ -1454,7 +1457,13 @@ class DipoleSurfaceManager(PropertyManager):
     def load_dipole_surface(self):
         raise NotImplementedError("haven't needed general dipole surfaces yet")
 
-    def _load_gaussian_fchk_dipoles(self, file, masses=None, freqs=None):
+    def _load_gaussian_fchk_dipoles(self, 
+                                    file, 
+                                    masses=None, 
+                                    freqs=None,
+                                    select_anharmonic_modes=None,
+                                    natoms=None):
+        print(natoms)
         try:
             keys = ['DipoleMoment', 'DipoleDerivatives', 'DipoleHigherDerivatives', 'DipoleNumDerivatives']
             with GaussianFChkReader(file) as gr:
@@ -1462,6 +1471,8 @@ class DipoleSurfaceManager(PropertyManager):
 
             mom, grad, high = tuple(parse[k] for k in keys[:3])
             grad = grad.array
+            high.set_n(natoms)
+            high.select_anharmonic_modes = select_anharmonic_modes
             seconds = high.second_deriv_array
             thirds = high.third_deriv_array
             num_derivs = parse[keys[3]]
@@ -1502,7 +1513,7 @@ class DipoleSurfaceManager(PropertyManager):
             "numerical": (mom, num_grad, num_secs)
         }
 
-    def load_dipole_derivatives(self, file=None):
+    def load_dipole_derivatives(self, file=None, select_anharmonic_modes=None, natoms=None):
         """
         Loads dipole derivatives from a file (or from `source_file` if set)
 
@@ -1521,7 +1532,7 @@ class DipoleSurfaceManager(PropertyManager):
         ext = ext.lower()
 
         if ext == ".fchk":
-            return self._load_gaussian_fchk_dipoles(file)
+            return self._load_gaussian_fchk_dipoles(file, select_anharmonic_modes=self.select_anharmonic_modes, natoms=natoms)
         elif ext == ".log":
             raise NotImplementedError("{}: support for loading dipole derivatives from {} files not there yet".format(
                 type(self).__name__,
@@ -1773,6 +1784,8 @@ class NormalModesManager(PropertyManager):
         super().__init__(mol)
         self._modes = normal_modes
         self._freqs = None # implementation detail
+        self._n = len(self.mol.atoms)
+        self.select_anharmonic_modes = mol.select_anharmonic_modes
 
     def set_molecule(self, mol):
         super().set_molecule(mol)
@@ -1787,7 +1800,7 @@ class NormalModesManager(PropertyManager):
         :rtype: MolecularVibrations
         """
         if self._modes is None:
-            self._modes = self.get_normal_modes()
+            self._modes = self.get_normal_modes(select_anharmonic_modes=self.select_anharmonic_modes)
         return self._modes
     @modes.setter
     def modes(self, modes):
@@ -1834,7 +1847,7 @@ class NormalModesManager(PropertyManager):
         self._modes = modes
     #TODO: need to be careful about transition states...
     recalc_normal_mode_tolerance = 1.0e-8
-    def load_normal_modes(self, file=None, rephase=True, recalculate=False):
+    def load_normal_modes(self, file=None, rephase=True, recalculate=False, select_anharmonic_modes=None):
         """
         Loads potential derivatives from a file (or from `source_file` if set)
 
@@ -1890,7 +1903,7 @@ class NormalModesManager(PropertyManager):
 
             if rephase:
                 try:
-                    phases = self.get_fchk_normal_mode_rephasing(modes)
+                    phases = self.get_fchk_normal_mode_rephasing(modes, select_anharmonic_modes)
                 except NotImplementedError:
                     pass
                 else:
@@ -1937,7 +1950,7 @@ class NormalModesManager(PropertyManager):
         """
 
         if self.mol.source_file is not None:
-            vibs = MolecularVibrations(self.mol, self.load_normal_modes())
+            vibs = MolecularVibrations(self.mol, self.load_normal_modes(**kwargs))
         else:
             fcs = self.mol.potential_surface.force_constants
             vibs = MolecularVibrations(self.mol,
@@ -1945,13 +1958,14 @@ class NormalModesManager(PropertyManager):
                                        )
 
         return vibs
-    def get_fchk_normal_mode_rephasing(self, modes=None):
+    def get_fchk_normal_mode_rephasing(self, modes=None, select_anharmonic_modes=None):
         """
         Returns the necessary rephasing to make the numerical dipole derivatives
         agree with the analytic dipole derivatives as pulled from a Gaussian FChk file
         :return:
         :rtype:
         """
+
 
         d1_analytic = self.mol.dipole_surface.derivatives
         if d1_analytic is None:

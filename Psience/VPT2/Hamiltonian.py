@@ -56,6 +56,7 @@ class PerturbationTheoryHamiltonian:
                  checkpoint=None,
                  results=None,
                  parallelizer=None,
+                 select_anharmonic_modes=None,
                  **expansion_options
                  ):
         """
@@ -97,6 +98,8 @@ class PerturbationTheoryHamiltonian:
             raise PerturbationTheoryException("{} requires a Molecule to do its dirty-work")
         # molecule = molecule.get_embedded_molecule()
         self.molecule = molecule
+        self.molecule.select_anharmonic_modes = select_anharmonic_modes
+        molecule.select_anharmonic_modes = select_anharmonic_modes
         if modes is None:
             modes = molecule.normal_modes.modes
         if mode_selection is not None:

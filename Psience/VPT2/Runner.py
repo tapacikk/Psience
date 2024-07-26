@@ -50,6 +50,7 @@ class VPTSystem:
         "internals",
         "modes",
         "mode_selection",
+        "select_anharmonic_modes",
         "potential_derivatives",
         "potential_function",
         "order",
@@ -67,7 +68,8 @@ class VPTSystem:
                  potential_function=None,
                  order=2,
                  dipole_derivatives=None,
-                 eckart_embed=False
+                 eckart_embed=False,
+                 select_anharmonic_modes=None
                  ):
         """
         :param mol: the molecule or system specification to use (doesn't really even need to be a molecule)
@@ -89,8 +91,10 @@ class VPTSystem:
         :param dipole_derivatives: the set of dipole derivatives to use for expansions
         :type dipole_derivatives: Iterable[np.ndarray]
         """
+        self.select_anharmonic_modes = select_anharmonic_modes
         if not isinstance(mol, Molecule):
-            mol = Molecule.from_spec(mol)
+            mol = Molecule.from_spec(mol, 
+                                     select_anharmonic_modes=self.select_anharmonic_modes)
         if internals is not None:
             if dummy_atoms is not None:
                 dummy_specs = []
@@ -528,7 +532,8 @@ class VPTHamiltonianOptions:
         "g_derivative_threshold",
         "gmatrix_tolerance",
         'use_cartesian_kinetic_energy',
-        'operator_coefficient_threshold'
+        'operator_coefficient_threshold',
+        'select_anharmonic_modes'
     )
 
     def __init__(self,
@@ -570,7 +575,8 @@ class VPTHamiltonianOptions:
                  gmatrix_tolerance=None,
                  use_internal_modes=None,
                  use_cartesian_kinetic_energy=None,
-                 operator_coefficient_threshold=None
+                 operator_coefficient_threshold=None,
+                 select_anharmonic_modes=None
                  ):
         """
         :param mode_selection: the set of the supplied normal modes to do perturbation theory on
@@ -665,7 +671,8 @@ class VPTHamiltonianOptions:
             g_derivative_threshold=g_derivative_threshold,
             gmatrix_tolerance=gmatrix_tolerance,
             use_cartesian_kinetic_energy=use_cartesian_kinetic_energy,
-            operator_coefficient_threshold=operator_coefficient_threshold
+            operator_coefficient_threshold=operator_coefficient_threshold,
+            select_anharmonic_modes=select_anharmonic_modes
         )
 
         real_opts = {}
@@ -1246,7 +1253,8 @@ class VPTRunner:
             ))
 
         par = ParameterManager(**opts)
-        sys = VPTSystem(system, **par.filter(VPTSystem))
+        sys = VPTSystem(system, 
+                        **par.filter(VPTSystem))
         if isinstance(states, int) or isinstance(states[0], int):
             states = VPTStateSpace.from_system_and_quanta(
                 sys,

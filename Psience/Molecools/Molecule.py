@@ -49,6 +49,7 @@ class Molecule(AbstractMolecule):
                  source_file=None,
                  guess_bonds=True,
                  charge=None,
+                 select_anharmonic_modes=None,
                  **metadata
                  ):
         """
@@ -84,6 +85,7 @@ class Molecule(AbstractMolecule):
         # convert "atoms" into list of atom data
         self._ats = [AtomData[atom] if isinstance(atom, (int, np.integer, str)) else atom for atom in atoms]
         self._mass = masses
+        self.select_anharmonic_modes = select_anharmonic_modes
 
         coords = CoordinateSet(coords, CartesianCoordinates3D)
 
@@ -1364,10 +1366,14 @@ class Molecule(AbstractMolecule):
             raise ValueError("don't know how to build a molecule from spec {}".format(spec))
 
     @classmethod
-    def from_spec(cls, spec):
+    def from_spec(cls, spec, **kwargs):
         fmt = cls._infer_spec_format(spec)
+        try: 
+            sam = kwargs['select_anharmonic_modes']
+        except KeyError:
+            sam = None
         if fmt == 'file':
-            return cls.from_file(spec)
+            return cls.from_file(spec, select_anharmonic_modes = sam)
         elif fmt == 'standard':
             atoms = spec[0]
             coords = spec[1]
