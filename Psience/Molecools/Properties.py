@@ -1463,19 +1463,24 @@ class DipoleSurfaceManager(PropertyManager):
                                     freqs=None,
                                     select_anharmonic_modes=None,
                                     natoms=None):
-        print(natoms)
         try:
             keys = ['DipoleMoment', 'DipoleDerivatives', 'DipoleHigherDerivatives', 'DipoleNumDerivatives']
             with GaussianFChkReader(file) as gr:
                 parse = gr.parse(keys)
 
             mom, grad, high = tuple(parse[k] for k in keys[:3])
+            # Analytical derivatives
             grad = grad.array
             high.set_n(natoms)
-            high.select_anharmonic_modes = select_anharmonic_modes
+            if select_anharmonic_modes:
+                high.set_select_anharmonic_modes(select_anharmonic_modes)
             seconds = high.second_deriv_array
             thirds = high.third_deriv_array
+            # Numerical derivatives
             num_derivs = parse[keys[3]]
+            num_derivs.set_n(natoms)
+            if select_anharmonic_modes:
+                num_derivs.set_select_anharmonic_modes(select_anharmonic_modes)
             num_grad = num_derivs.first_derivatives
             num_secs = num_derivs.second_derivatives
         except GaussianFChkReaderException:
