@@ -1618,6 +1618,8 @@ class PotentialSurfaceManager(PropertyManager):
     name="PotentialSurface"
     def __init__(self, mol, surface=None, derivatives=None):
         super().__init__(mol)
+        self.select_anharmonic_modes = mol.select_anharmonic_modes
+        self.natoms = len(mol.atoms)
         self._surf = surface
         self._derivs = derivatives
 
@@ -1630,7 +1632,8 @@ class PotentialSurfaceManager(PropertyManager):
     @property
     def derivatives(self):
         if self._derivs is None:
-            self._derivs = self.load_potential_derivatives()
+            self._derivs = self.load_potential_derivatives(select_anharmonic_modes=self.select_anharmonic_modes, 
+                                                           natoms=self.natoms)
         return self._derivs
     @derivatives.setter
     def derivatives(self, v):
@@ -1640,7 +1643,10 @@ class PotentialSurfaceManager(PropertyManager):
     def force_constants(self):
         return self.derivatives[1]
 
-    def load_potential_derivatives(self, file=None):
+    def load_potential_derivatives(self, 
+                                   file=None, 
+                                   select_anharmonic_modes=None, 
+                                   natoms=None):
         """
         Loads potential derivatives from a file (or from `source_file` if set)
 
@@ -1663,8 +1669,13 @@ class PotentialSurfaceManager(PropertyManager):
 
             seconds = parse["ForceConstants"].array
             if parse["ForceDerivatives"] is not None:
-                thirds = parse["ForceDerivatives"].third_deriv_array
-                fourths = parse["ForceDerivatives"].fourth_deriv_array
+                parsed_derivs = parse["ForceDerivatives"]
+                if natoms:
+                    parsed_derivs.set_n(natoms)
+                if select_anharmonic_modes:
+                    parsed_derivs.select_anharmonic_modes = select_anharmonic_modes
+                thirds = parsed_derivs.third_deriv_array
+                fourths = parsed_derivs.fourth_deriv_array
                 if isinstance(fourths, nput.SparseArray):
                     fourths = fourths.asarray()
 
